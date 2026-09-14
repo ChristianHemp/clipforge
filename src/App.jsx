@@ -6,8 +6,13 @@ import Timeline from './components/Timeline';
 import Inspector from './components/Inspector';
 import { useEditorStore } from './store/editorStore';
 import { useProjectStore } from './store/projectStore';
+import { usePlaybackClock } from './hooks/usePlaybackClock';
 
 export default function App() {
+  // Mounted once, globally - this is what actually advances
+  // currentTime during playback. See hooks/usePlaybackClock.js.
+  usePlaybackClock();
+
   const selectedClipId = useEditorStore((state) => state.selectedClipId);
   const setSelectedClipId = useEditorStore((state) => state.setSelectedClipId);
   const removeClip = useProjectStore((state) => state.removeClip);
