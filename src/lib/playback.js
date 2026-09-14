@@ -9,7 +9,17 @@ export function getProjectDuration(tracks) {
   let duration = 0;
   for (const track of tracks) {
     for (const clip of track.clips) {
-      duration = Math.max(duration, clip.startTime + clip.duration);
+      const clipEnd = clip.startTime + clip.duration;
+      // Math.max propagates NaN/Infinity through the entire reduction
+      // if let through unguarded - one clip with a bad (non-finite)
+      // duration would otherwise make the WHOLE project's derived
+      // duration non-finite, breaking the playback clock's stop
+      // condition and every seek clamp that depends on it. Skipping a
+      // bad clip here is a safety net; the real fix is not producing
+      // one in the first place (see mediaProbe.js).
+      if (Number.isFinite(clipEnd)) {
+        duration = Math.max(duration, clipEnd);
+      }
     }
   }
   return duration;

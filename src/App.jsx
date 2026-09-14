@@ -7,11 +7,18 @@ import Inspector from './components/Inspector';
 import { useEditorStore } from './store/editorStore';
 import { useProjectStore } from './store/projectStore';
 import { usePlaybackClock } from './hooks/usePlaybackClock';
+import { useProjectPersistence } from './hooks/useProjectPersistence';
 
 export default function App() {
   // Mounted once, globally - this is what actually advances
   // currentTime during playback. See hooks/usePlaybackClock.js.
   usePlaybackClock();
+
+  // Also mounted once, globally: loads any saved project from
+  // IndexedDB on startup, then debounce-saves future changes back to
+  // it. See hooks/useProjectPersistence.js.
+  useProjectPersistence();
+  const isHydrated = useEditorStore((state) => state.isHydrated);
 
   const selectedClipId = useEditorStore((state) => state.selectedClipId);
   const setSelectedClipId = useEditorStore((state) => state.setSelectedClipId);
@@ -34,6 +41,17 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedClipId, removeClip, setSelectedClipId]);
+
+  // Wait for hydration before rendering the real editor - otherwise a
+  // saved project would flash as empty for a moment while IndexedDB
+  // reads resolve, which is confusing at best and (if hydration were
+  // slow) risks the debounced autosave firing against real data before
+  // it's been restored. useProjectPersistence.js already guards
+  // against that at the persistence layer; this is the UI-visible
+  // half of the same guarantee.
+  if (!isHydrated) {
+    return <div className="app-loading">Loading project…</div>;
+  }
 
   return (
     <div className="app">

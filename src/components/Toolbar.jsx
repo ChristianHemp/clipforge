@@ -1,13 +1,19 @@
 import { useEditorStore } from '../store/editorStore';
 import { useProjectStore } from '../store/projectStore';
 import { getProjectDuration, formatTime } from '../lib/playback';
+import { clearPersistedProject } from '../lib/projectPersistence';
 
 export default function Toolbar() {
   const isPlaying = useEditorStore((state) => state.isPlaying);
   const currentTime = useEditorStore((state) => state.currentTime);
   const setCurrentTime = useEditorStore((state) => state.setCurrentTime);
   const togglePlayback = useEditorStore((state) => state.togglePlayback);
+  const persistenceError = useEditorStore((state) => state.persistenceError);
+  const setPersistenceError = useEditorStore((state) => state.setPersistenceError);
+  const resetTransientState = useEditorStore((state) => state.resetTransientState);
   const tracks = useProjectStore((state) => state.tracks);
+  const assets = useProjectStore((state) => state.assets);
+  const clearProject = useProjectStore((state) => state.clearProject);
 
   const projectDuration = getProjectDuration(tracks);
 
@@ -23,6 +29,25 @@ export default function Toolbar() {
     togglePlayback();
   }
 
+  async function handleClearProject() {
+    if (assets.length === 0 && tracks.length === 0) return; // nothing to clear
+    const confirmed = window.confirm(
+      'Clear the current project? This removes all uploaded media and cannot be undone.'
+    );
+    if (!confirmed) return;
+
+    clearProject(); // in-memory: revokes blob URLs, empties assets/tracks
+    resetTransientState(); // selection/playhead/playback back to defaults
+
+    try {
+      await clearPersistedProject(); // immediate, not debounced - a refresh right after Clear shouldn't restore stale data
+      setPersistenceError(null);
+    } catch (error) {
+      console.error('Failed to clear saved project from storage:', error);
+      setPersistenceError('Could not fully clear saved data - it may reappear after refresh.');
+    }
+  }
+
   return (
     <header className="toolbar">
       <h1>Video Editor</h1>
@@ -34,6 +59,10 @@ export default function Toolbar() {
           {formatTime(currentTime)} / {formatTime(projectDuration)}
         </span>
       </div>
+      <button className="clear-project-button" onClick={handleClearProject}>
+        Clear Project
+      </button>
+      {persistenceError && <span className="persistence-error">{persistenceError}</span>}
     </header>
   );
 }

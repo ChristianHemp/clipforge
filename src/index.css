@@ -76,6 +76,29 @@ button:hover {
   font-size: 13px;
 }
 
+.clear-project-button {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.clear-project-button:hover {
+  background: var(--danger);
+  color: white;
+}
+
+.persistence-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.app-loading {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
+
 .main-area {
   flex: 1;
   display: flex;
@@ -316,11 +339,17 @@ button:hover {
   bottom: 4px;
   background: var(--accent);
   border-radius: 3px;
-  padding: 4px 8px;
+  padding: 4px 10px;
   overflow: hidden;
-  cursor: pointer;
+  cursor: grab;
   display: flex;
   align-items: center;
+  user-select: none; /* dragging shouldn't highlight the clip label as text */
+  touch-action: none; /* let pointer events drive dragging, not browser scroll/zoom gestures */
+}
+
+.clip:active {
+  cursor: grabbing;
 }
 
 .clip-name {
@@ -334,4 +363,27 @@ button:hover {
 .clip-selected {
   outline: 2px solid white;
   outline-offset: 1px;
+}
+
+.clip-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: ew-resize;
+}
+
+.clip-handle:hover {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.clip-handle-left {
+  left: 0;
+  border-radius: 3px 0 0 3px;
+}
+
+.clip-handle-right {
+  right: 0;
+  border-radius: 0 3px 3px 0;
 }

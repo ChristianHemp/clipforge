@@ -18,14 +18,38 @@ function probeVideoOrAudio(file, tagName) {
     const el = document.createElement(tagName);
     const objectUrl = URL.createObjectURL(file);
 
-    el.preload = 'metadata';
-    el.onloadedmetadata = () => {
+    function finish(duration) {
       resolve({
-        duration: el.duration,
+        duration,
         width: el.videoWidth || undefined,
         height: el.videoHeight || undefined,
       });
       URL.revokeObjectURL(objectUrl);
+    }
+
+    el.preload = 'metadata';
+    el.onloadedmetadata = () => {
+      if (Number.isFinite(el.duration)) {
+        finish(el.duration);
+        return;
+      }
+
+      // Files produced by MediaRecorder (screen/webcam captures - a
+      // very common source for locally-made test clips) often lack a
+      // proper duration header, so the browser reports `Infinity`
+      // (sometimes NaN) here instead of the real length. Seeking far
+      // past the end forces it to scan the file and resolve the true
+      // duration, which then arrives via `durationchange`. Skipping
+      // this would let a non-finite duration flow into clip.duration/
+      // trimEnd, which poisons every derived calculation downstream
+      // (project duration, the playback clock's stop condition, seek
+      // clamping) - not just a display glitch for this one clip.
+      el.addEventListener(
+        'durationchange',
+        () => finish(Number.isFinite(el.duration) ? el.duration : 0),
+        { once: true }
+      );
+      el.currentTime = 1e101;
     };
     el.onerror = () => {
       URL.revokeObjectURL(objectUrl);

@@ -3,6 +3,7 @@ import { useProjectStore } from '../store/projectStore';
 import { generateId } from '../lib/id';
 import { detectAssetType, probeMediaMetadata } from '../lib/mediaProbe';
 import { DEFAULT_IMAGE_DURATION } from '../lib/constants';
+import { saveAssetBlob } from '../lib/projectPersistence';
 import MediaItem from './MediaItem';
 
 export default function MediaLibrary() {
@@ -25,15 +26,25 @@ export default function MediaLibrary() {
 
       try {
         const metadata = await probeMediaMetadata(file, type);
+        const id = generateId();
         addAsset({
-          id: generateId(),
+          id,
           name: file.name,
           type,
+          blob: file, // the raw File itself - kept so it can be persisted below and (if ever needed again) re-read without another prompt
           src: URL.createObjectURL(file),
           duration: metadata.duration ?? DEFAULT_IMAGE_DURATION,
           width: metadata.width,
           height: metadata.height,
         });
+
+        // Saved once, here, at upload time - not part of the debounced
+        // structural autosave (useProjectPersistence.js), since a
+        // clip's media never changes after it's uploaded, only how
+        // it's positioned/trimmed on the timeline.
+        saveAssetBlob(id, file).catch((error) =>
+          console.error('Failed to save uploaded media for offline use:', error)
+        );
       } catch (error) {
         console.error('Failed to read media metadata:', error);
       }

@@ -32,6 +32,28 @@ export const useProjectStore = create((set, get) => ({
     });
   },
 
+  // Bulk-replaces assets/tracks in one shot. This is the ONE
+  // deliberate exception to "no full-project replacement" - but it's
+  // a fundamentally different operation from an AI overwriting
+  // in-progress work: it's called exactly once, at app startup,
+  // loading the user's OWN previously-saved state into what is still
+  // an empty store, before any editing has happened. See
+  // hooks/useProjectPersistence.js, the only caller.
+  hydrate: ({ assets, tracks }) => {
+    set({ assets, tracks });
+  },
+
+  // Revokes every asset's blob URL, then empties the project. Used by
+  // the Toolbar's "Clear Project" action.
+  clearProject: () => {
+    set((state) => {
+      for (const asset of state.assets) {
+        if (asset.src) URL.revokeObjectURL(asset.src);
+      }
+      return { assets: [], tracks: [] };
+    });
+  },
+
   // Finds the first track of the given type, or creates one.
   // Returns the track id either way, so callers can immediately use it
   // in addClip() without a second render/read cycle.
