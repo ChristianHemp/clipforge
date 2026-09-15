@@ -4,6 +4,7 @@ import { useHistoryStore } from '../store/historyStore';
 import { getProjectDuration, formatTime } from '../lib/playback';
 import { clearPersistedProject } from '../lib/projectPersistence';
 import { performUndo, performRedo } from '../lib/undoRedoActions';
+import { useExportProject } from '../export/useExportProject';
 
 export default function Toolbar() {
   const isPlaying = useEditorStore((state) => state.isPlaying);
@@ -19,6 +20,7 @@ export default function Toolbar() {
   const canUndo = useHistoryStore((state) => state.past.length > 0);
   const canRedo = useHistoryStore((state) => state.future.length > 0);
   const clearHistory = useHistoryStore((state) => state.clearHistory);
+  const exportState = useExportProject();
 
   const projectDuration = getProjectDuration(tracks);
 
@@ -70,6 +72,22 @@ export default function Toolbar() {
         <span className="time-readout">
           {formatTime(currentTime)} / {formatTime(projectDuration)}
         </span>
+      </div>
+      <div className="export-controls">
+        <button
+          onClick={exportState.startExport}
+          disabled={projectDuration <= 0 || exportState.status === 'exporting' || !exportState.isSupported}
+          title={!exportState.isSupported ? 'This browser does not support video export' : undefined}
+        >
+          Export
+        </button>
+        {exportState.status === 'exporting' && (
+          <>
+            <span className="export-progress">Exporting… {Math.round(exportState.progress * 100)}%</span>
+            <button onClick={exportState.cancelExport}>Cancel</button>
+          </>
+        )}
+        {exportState.status === 'error' && <span className="export-error">{exportState.error}</span>}
       </div>
       <button className="clear-project-button" onClick={handleClearProject}>
         Clear Project

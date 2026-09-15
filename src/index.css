@@ -85,6 +85,23 @@ button:disabled:hover {
   font-size: 13px;
 }
 
+.export-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-progress {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.export-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
 .clear-project-button {
   border-color: var(--danger);
   color: var(--danger);
