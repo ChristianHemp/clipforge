@@ -3,7 +3,13 @@ import { useEditorStore } from '../store/editorStore';
 import { useProjectStore } from '../store/projectStore';
 import { useHistoryStore } from '../store/historyStore';
 import { beginPointerDrag } from '../lib/pointerDrag';
-import { calculateClipMove, calculateLeftTrim, calculateRightTrim } from '../lib/clipEditing';
+import {
+  calculateClipMove,
+  calculateLeftTrim,
+  calculateRightTrim,
+  calculateOverlayLeftTrim,
+  calculateOverlayRightTrim,
+} from '../lib/clipEditing';
 import { PIXELS_PER_SECOND } from '../lib/constants';
 
 export default function Clip({ clip, asset }) {
@@ -16,6 +22,10 @@ export default function Clip({ clip, asset }) {
   const commitTransaction = useHistoryStore((state) => state.commitTransaction);
   const cancelTransaction = useHistoryStore((state) => state.cancelTransaction);
   const isSelected = selectedClipId === clip.id;
+  // Text overlays (Phase 8) have no source media - assetId/trimStart/
+  // trimEnd - so their trim handles use the simpler, media-free math
+  // in clipEditing.js instead of calculateLeftTrim/calculateRightTrim.
+  const isText = clip.type === 'text';
 
   // Shared by all three drag handlers: a real drag/trim (the pointer
   // actually moved) becomes exactly one history entry; a plain
@@ -57,8 +67,8 @@ export default function Clip({ clip, asset }) {
     dragOriginRef.current = { startTime: clip.startTime };
 
     beginPointerDrag(event, {
-      onMove: (deltaPixels) => {
-        const deltaSeconds = deltaPixels / PIXELS_PER_SECOND;
+      onMove: (deltaX) => {
+        const deltaSeconds = deltaX / PIXELS_PER_SECOND;
         const startTime = calculateClipMove(dragOriginRef.current.startTime, deltaSeconds);
         updateClip(clip.id, { startTime });
       },
@@ -73,16 +83,17 @@ export default function Clip({ clip, asset }) {
     selectAndPause();
     beginTransaction();
 
-    dragOriginRef.current = {
-      startTime: clip.startTime,
-      duration: clip.duration,
-      trimStart: clip.trimStart ?? 0,
-    };
+    dragOriginRef.current = isText
+      ? { startTime: clip.startTime, duration: clip.duration }
+      : { startTime: clip.startTime, duration: clip.duration, trimStart: clip.trimStart ?? 0 };
 
     beginPointerDrag(event, {
-      onMove: (deltaPixels) => {
-        const deltaSeconds = deltaPixels / PIXELS_PER_SECOND;
-        updateClip(clip.id, calculateLeftTrim({ ...dragOriginRef.current, deltaSeconds }));
+      onMove: (deltaX) => {
+        const deltaSeconds = deltaX / PIXELS_PER_SECOND;
+        const updates = isText
+          ? calculateOverlayLeftTrim({ ...dragOriginRef.current, deltaSeconds })
+          : calculateLeftTrim({ ...dragOriginRef.current, deltaSeconds });
+        updateClip(clip.id, updates);
       },
       onEnd: endTransaction,
     });
@@ -95,18 +106,17 @@ export default function Clip({ clip, asset }) {
     selectAndPause();
     beginTransaction();
 
-    dragOriginRef.current = {
-      trimStart: clip.trimStart ?? 0,
-      trimEnd: clip.trimEnd ?? clip.duration,
-    };
+    dragOriginRef.current = isText
+      ? { duration: clip.duration }
+      : { trimStart: clip.trimStart ?? 0, trimEnd: clip.trimEnd ?? clip.duration };
 
     beginPointerDrag(event, {
-      onMove: (deltaPixels) => {
-        const deltaSeconds = deltaPixels / PIXELS_PER_SECOND;
-        updateClip(
-          clip.id,
-          calculateRightTrim({ ...dragOriginRef.current, deltaSeconds, sourceDuration: asset?.duration })
-        );
+      onMove: (deltaX) => {
+        const deltaSeconds = deltaX / PIXELS_PER_SECOND;
+        const updates = isText
+          ? calculateOverlayRightTrim({ ...dragOriginRef.current, deltaSeconds })
+          : calculateRightTrim({ ...dragOriginRef.current, deltaSeconds, sourceDuration: asset?.duration });
+        updateClip(clip.id, updates);
       },
       onEnd: endTransaction,
     });
@@ -117,15 +127,17 @@ export default function Clip({ clip, asset }) {
     width: `${Math.max(clip.duration * PIXELS_PER_SECOND, 4)}px`,
   };
 
+  const label = isText ? clip.text || 'Text' : (asset?.name ?? 'Missing asset');
+
   return (
     <div
-      className={`clip${isSelected ? ' clip-selected' : ''}`}
+      className={`clip${isText ? ' clip-text' : ''}${isSelected ? ' clip-selected' : ''}`}
       style={style}
       onClick={(event) => event.stopPropagation()}
       onPointerDown={handleBodyPointerDown}
     >
       <div className="clip-handle clip-handle-left" onPointerDown={handleLeftHandlePointerDown} />
-      <span className="clip-name">{asset?.name ?? 'Missing asset'}</span>
+      <span className="clip-name">{label}</span>
       <div className="clip-handle clip-handle-right" onPointerDown={handleRightHandlePointerDown} />
     </div>
   );

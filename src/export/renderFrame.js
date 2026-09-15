@@ -1,5 +1,6 @@
 import { getActiveClip, getClipSourceTime } from '../lib/playback';
 import { computeAspectFitRect } from './aspectFit';
+import { drawTextOverlays } from './renderTextOverlays';
 
 // Looser than Preview's 0.3s tolerance would be too loose for export
 // (we want the recorded frame to closely match the intended source
@@ -28,40 +29,48 @@ export function createFrameRenderer() {
     // which clip is showing at a given time.
     const activeClip = getActiveClip(tracks, assets, time, 'video');
 
+    // Restructured (Phase 8) from three early `return`s into this
+    // if/else so text overlays - drawn unconditionally at the end -
+    // still appear during a video gap or a missing-asset frame, not
+    // just while a video happens to be active. Every branch below is
+    // otherwise unchanged from the original per-video logic.
     if (!activeClip) {
       pauseAll(videoElements);
       lastActiveClipId = null;
-      return;
+    } else {
+      const video = videoElements.get(activeClip.assetId);
+      if (!video) {
+        // Referenced asset failed to load into an export video element -
+        // draw black for this frame rather than aborting the whole export.
+        lastActiveClipId = activeClip.id;
+      } else {
+        pauseAllExcept(videoElements, activeClip.assetId);
+
+        const sourceTime = getClipSourceTime(activeClip, time);
+        const clipJustBecameActive = activeClip.id !== lastActiveClipId;
+        const drifted = Math.abs(video.currentTime - sourceTime) > DRIFT_TOLERANCE_SECONDS;
+
+        // A clip change always forces a seek, regardless of drift - two
+        // different clips can reference the same asset, where the drift
+        // check alone might (wrongly) look "close enough".
+        if (clipJustBecameActive || drifted) {
+          await seekTo(video, sourceTime);
+        }
+        if (video.paused) {
+          await video.play().catch(() => {});
+        }
+
+        const rect = computeAspectFitRect(video.videoWidth, video.videoHeight, canvasWidth, canvasHeight);
+        ctx.drawImage(video, rect.x, rect.y, rect.width, rect.height);
+
+        lastActiveClipId = activeClip.id;
+      }
     }
 
-    const video = videoElements.get(activeClip.assetId);
-    if (!video) {
-      // Referenced asset failed to load into an export video element -
-      // draw black for this frame rather than aborting the whole export.
-      lastActiveClipId = activeClip.id;
-      return;
-    }
-
-    pauseAllExcept(videoElements, activeClip.assetId);
-
-    const sourceTime = getClipSourceTime(activeClip, time);
-    const clipJustBecameActive = activeClip.id !== lastActiveClipId;
-    const drifted = Math.abs(video.currentTime - sourceTime) > DRIFT_TOLERANCE_SECONDS;
-
-    // A clip change always forces a seek, regardless of drift - two
-    // different clips can reference the same asset, where the drift
-    // check alone might (wrongly) look "close enough".
-    if (clipJustBecameActive || drifted) {
-      await seekTo(video, sourceTime);
-    }
-    if (video.paused) {
-      await video.play().catch(() => {});
-    }
-
-    const rect = computeAspectFitRect(video.videoWidth, video.videoHeight, canvasWidth, canvasHeight);
-    ctx.drawImage(video, rect.x, rect.y, rect.width, rect.height);
-
-    lastActiveClipId = activeClip.id;
+    // Text overlays draw on top of whatever was (or wasn't) drawn
+    // above - independent of video activity, so a title card can show
+    // during a video gap.
+    drawTextOverlays(ctx, { canvasWidth, canvasHeight, time, tracks });
   };
 }
 

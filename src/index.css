@@ -242,6 +242,45 @@ button:disabled:hover {
   max-height: 100%;
 }
 
+/* Fixed EXPORT_WIDTH:EXPORT_HEIGHT (16:9) box - the "composition
+   canvas" text overlays are positioned relative to. Letterboxed/
+   pillarboxed within .preview-surface by aspect-ratio + max-width/
+   max-height, the same way an <img> naturally fits via intrinsic
+   aspect ratio - mirrors export's computeAspectFitRect centering. */
+.composition-frame {
+  position: relative;
+  aspect-ratio: 1280 / 720;
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  background: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.overlay-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* clicks pass through empty areas to the composition-frame's own deselect handler; individual overlays opt back in */
+}
+
+.text-overlay {
+  position: absolute;
+  transform: translate(-50%, -50%); /* x/y is the text's CENTER point, not its top-left corner */
+  pointer-events: auto;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+  white-space: nowrap; /* single-line only - see Inspector's plain <input type="text"> for the text field */
+}
+
+.text-overlay-selected {
+  outline: 2px dashed white;
+  outline-offset: 4px;
+}
+
 /* Inspector */
 .inspector {
   width: 240px;
@@ -261,6 +300,50 @@ button:disabled:hover {
 
 .clip-details dd {
   margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.field-label {
+  color: var(--text-dim);
+}
+
+.field input,
+.field select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+.field input[type='color'] {
+  padding: 2px;
+  height: 32px;
+}
+
+.alignment-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.alignment-buttons button {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 12px;
+}
+
+.alignment-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
 }
 
 .delete-button {
@@ -389,6 +472,10 @@ button:disabled:hover {
 .clip-selected {
   outline: 2px solid white;
   outline-offset: 1px;
+}
+
+.clip-text {
+  background: #7a5cc9; /* distinct from the media-clip accent color, no other meaning */
 }
 
 .clip-handle {

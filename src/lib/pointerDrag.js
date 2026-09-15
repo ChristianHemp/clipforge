@@ -5,10 +5,12 @@
 // on one element instead of attaching (and remembering to remove)
 // listeners on `document`.
 //
-// `onMove(deltaPixels)` fires on every pointermove with the total
-// horizontal distance moved since pointerdown - callers convert that
-// to seconds themselves using PIXELS_PER_SECOND, so this module has no
-// timeline-specific knowledge at all. `onEnd(moved)` fires once,
+// `onMove(deltaX, deltaY)` fires on every pointermove with the total
+// horizontal AND vertical distance moved since pointerdown - callers
+// convert whichever axes they care about themselves (Clip.jsx's
+// horizontal-only timeline drags read just deltaX; TextOverlayLayer's
+// 2D spatial drag reads both), so this module has no timeline- or
+// Preview-specific knowledge at all. `onEnd(moved)` fires once,
 // whether the gesture finished normally (pointerup) or was interrupted
 // (pointercancel - e.g. the browser takes over for a system gesture).
 // `moved` is false for a plain click (pointerdown+pointerup with zero
@@ -19,12 +21,13 @@
 export function beginPointerDrag(event, { onMove, onEnd }) {
   const element = event.currentTarget;
   const startClientX = event.clientX;
+  const startClientY = event.clientY;
   element.setPointerCapture(event.pointerId);
   let moved = false;
 
   function handleMove(moveEvent) {
     moved = true;
-    onMove(moveEvent.clientX - startClientX);
+    onMove(moveEvent.clientX - startClientX, moveEvent.clientY - startClientY);
   }
 
   function stopDragging() {

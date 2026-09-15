@@ -6,6 +6,10 @@ import { clearPersistedProject } from '../lib/projectPersistence';
 import { performUndo, performRedo } from '../lib/undoRedoActions';
 import { useExportProject } from '../export/useExportProject';
 import { resumeEditorAudioContext } from '../audio/audioGraph';
+import { generateId } from '../lib/id';
+import { DEFAULT_OVERLAY_STYLE } from '../lib/textGeometry';
+
+const DEFAULT_TEXT_OVERLAY_DURATION = 3;
 
 export default function Toolbar() {
   const isPlaying = useEditorStore((state) => state.isPlaying);
@@ -15,15 +19,36 @@ export default function Toolbar() {
   const persistenceError = useEditorStore((state) => state.persistenceError);
   const setPersistenceError = useEditorStore((state) => state.setPersistenceError);
   const resetTransientState = useEditorStore((state) => state.resetTransientState);
+  const setSelectedClipId = useEditorStore((state) => state.setSelectedClipId);
   const tracks = useProjectStore((state) => state.tracks);
   const assets = useProjectStore((state) => state.assets);
   const clearProject = useProjectStore((state) => state.clearProject);
+  const getOrCreateTrack = useProjectStore((state) => state.getOrCreateTrack);
+  const addClip = useProjectStore((state) => state.addClip);
   const canUndo = useHistoryStore((state) => state.past.length > 0);
   const canRedo = useHistoryStore((state) => state.future.length > 0);
   const clearHistory = useHistoryStore((state) => state.clearHistory);
+  const checkpoint = useHistoryStore((state) => state.checkpoint);
   const exportState = useExportProject();
 
   const projectDuration = getProjectDuration(tracks);
+
+  function handleAddText() {
+    checkpoint(); // one history entry for the whole creation
+    const trackId = getOrCreateTrack('text');
+    const id = generateId();
+    addClip(trackId, {
+      id,
+      type: 'text',
+      text: 'Text',
+      startTime: currentTime,
+      duration: DEFAULT_TEXT_OVERLAY_DURATION,
+      x: 0.5,
+      y: 0.5,
+      ...DEFAULT_OVERLAY_STYLE,
+    });
+    setSelectedClipId(id); // select it immediately so Inspector shows its fields for editing right away
+  }
 
   function handleTogglePlayback() {
     if (!isPlaying) {
@@ -77,6 +102,7 @@ export default function Toolbar() {
           {formatTime(currentTime)} / {formatTime(projectDuration)}
         </span>
       </div>
+      <button onClick={handleAddText}>Add Text</button>
       <div className="export-controls">
         <button
           onClick={exportState.startExport}

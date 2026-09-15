@@ -61,3 +61,37 @@ export function calculateLeftTrim({ startTime, duration, trimStart, deltaSeconds
     duration: duration - clampedDelta,
   };
 }
+
+// The two functions above are intrinsically media-aware (trimStart/
+// trimEnd/sourceDuration are source-media concepts). Text overlays
+// have no source media at all - "trimming" one only ever means
+// "change when it starts and how long it lasts", so these are
+// deliberately SEPARATE, simpler functions rather than the media
+// functions with their trim fields made optional: threading an
+// "optional, sometimes meaningless" trimStart through the
+// well-tested media math above would add branching to working code
+// for a benefit (shared code) that's mostly illusory - the actual
+// overlapping logic is exactly the clamped-delta idea, one line each.
+
+// Left handle: keeps the timeline END point (startTime + duration)
+// fixed while startTime moves, exactly like calculateLeftTrim's
+// timing behavior - just without a trimStart to move in lockstep.
+export function calculateOverlayLeftTrim({ startTime, duration, deltaSeconds }) {
+  const minDelta = -startTime;
+  const maxDelta = duration - MIN_CLIP_DURATION;
+  const clampedDelta = clamp(deltaSeconds, minDelta, maxDelta);
+
+  return {
+    startTime: startTime + clampedDelta,
+    duration: duration - clampedDelta,
+  };
+}
+
+// Right handle: startTime stays fixed, duration grows/shrinks with no
+// upper bound (there's no source length to cap it at - unlike media's
+// calculateRightTrim, which clamps to sourceDuration).
+export function calculateOverlayRightTrim({ duration, deltaSeconds }) {
+  return {
+    duration: Math.max(duration + deltaSeconds, MIN_CLIP_DURATION),
+  };
+}

@@ -82,6 +82,27 @@ export function getActiveClips(tracks, assets, time, assetType) {
   return active;
 }
 
+// Finds every TEXT overlay active at `time`. Deliberately separate
+// from getActiveClip(s) rather than a third case of `assetType`: text
+// overlays have no assetId at all (they're not media), so there's
+// nothing to look up in `assets` - they're typed directly via
+// `clip.type === 'text'` instead, a field only text overlays carry
+// (media clips have no `type` field of their own; their type is
+// inferred from their asset). Like audio, multiple overlays may be
+// active simultaneously - there's no single-item policy for text.
+export function getActiveTextOverlays(tracks, time) {
+  const active = [];
+  for (const track of tracks) {
+    for (const clip of track.clips) {
+      if (clip.type !== 'text') continue;
+      if (time >= clip.startTime && time < clip.startTime + clip.duration) {
+        active.push(clip);
+      }
+    }
+  }
+  return active;
+}
+
 // Maps a moment on the global timeline to a moment within the clip's
 // own source media. E.g. if a clip starts at t=8 on the timeline but
 // its source video is trimmed to start 2s in, then timeline time 11
