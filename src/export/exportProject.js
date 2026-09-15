@@ -132,8 +132,9 @@ export async function exportProject({ tracks, assets }, { onProgress, signal } =
               tracks,
               assets,
               videoElements,
+              audioGraph,
             }),
-            syncAudio(exportTime, { tracks, assets, audioElements }),
+            syncAudio(exportTime, { tracks, assets, audioElements, audioGraph }),
           ])
             .then(() => {
               onProgress?.(exportTime / duration);

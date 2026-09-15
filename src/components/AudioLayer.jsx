@@ -14,10 +14,10 @@ const DRIFT_TOLERANCE_SECONDS = 0.15;
 // element's sync/routing lifecycle.
 export default function AudioLayer({ asset, clip, currentTime, isPlaying }) {
   const audioRef = useRef(null);
-  useMediaElementAudioRouting(audioRef);
+  const gainNodeRef = useMediaElementAudioRouting(audioRef);
 
   useEffect(() => {
-    syncMediaElement(audioRef.current, clip, currentTime, isPlaying, DRIFT_TOLERANCE_SECONDS);
+    syncMediaElement(audioRef.current, clip, currentTime, isPlaying, DRIFT_TOLERANCE_SECONDS, gainNodeRef.current);
   }, [clip, currentTime, isPlaying]);
 
   // Deterministically silence this element the instant it's no longer

@@ -42,12 +42,25 @@ export async function createExportAudioGraph() {
 
     const sourceNode = audioContext.createMediaElementSource(mediaElement);
     const gainNode = audioContext.createGain();
-    gainNode.gain.value = 1;
+    gainNode.gain.value = 1; // corrected to the active clip's real volume every tick - see renderFrame.js / syncExportAudio.js
     sourceNode.connect(gainNode).connect(destination);
 
     const route = { sourceNode, gainNode };
     routedElements.set(mediaElement, route);
     return route;
+  }
+
+  // Phase 9: the SAME video element can be shared across two different
+  // clips that reference the same asset (loadExportVideoElements.js
+  // keys by assetId, not clip id), and those two clips could have
+  // different volumes - so gain can't just be set once here at routing
+  // time. This accessor lets the per-tick render/sync code look up the
+  // already-routed node and re-apply whichever clip is currently active
+  // each frame. Standalone audio elements (keyed by clip id, never
+  // shared) don't strictly need this, but use the same accessor for
+  // consistency rather than two different gain-setting strategies.
+  function getGainNode(mediaElement) {
+    return routedElements.get(mediaElement)?.gainNode;
   }
 
   async function close() {
@@ -58,5 +71,5 @@ export async function createExportAudioGraph() {
     }
   }
 
-  return { destination, routeElement, close };
+  return { destination, routeElement, getGainNode, close };
 }

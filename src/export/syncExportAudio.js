@@ -1,4 +1,5 @@
 import { getActiveClips, getClipSourceTime } from '../lib/playback';
+import { getClipVolume } from '../lib/volume';
 
 // Same tolerance as the editor's AudioLayer (src/components/AudioLayer.jsx).
 const DRIFT_TOLERANCE_SECONDS = 0.15;
@@ -18,7 +19,7 @@ const DRIFT_TOLERANCE_SECONDS = 0.15;
 export function createAudioSynchronizer() {
   let previouslyActiveIds = new Set();
 
-  return async function syncExportAudio(time, { tracks, assets, audioElements }) {
+  return async function syncExportAudio(time, { tracks, assets, audioElements, audioGraph }) {
     const activeClips = getActiveClips(tracks, assets, time, 'audio');
     const nowActiveIds = new Set(activeClips.map((clip) => clip.id));
 
@@ -35,6 +36,16 @@ export function createAudioSynchronizer() {
       activeClips.map(async (clip) => {
         const audio = audioElements.get(clip.id);
         if (!audio) return; // asset failed to load for export - skip silently, matching renderFrame.js's "draw black" fallback for the equivalent video case
+
+        // Standalone audio elements are keyed by clip id (never shared
+        // across clips - see loadExportAudioElements.js), so this only
+        // ever needs to reflect the ONE clip this element belongs to,
+        // but it's applied every tick for consistency with the video
+        // path above rather than two different gain-setting strategies.
+        const gainNode = audioGraph?.getGainNode(audio);
+        if (gainNode) {
+          gainNode.gain.value = getClipVolume(clip);
+        }
 
         const sourceTime = getClipSourceTime(clip, time);
         const justBecameActive = !previouslyActiveIds.has(clip.id);

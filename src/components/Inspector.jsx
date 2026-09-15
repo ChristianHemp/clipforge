@@ -3,6 +3,7 @@ import { useEditorStore } from '../store/editorStore';
 import { useProjectStore, findClip } from '../store/projectStore';
 import { useHistoryStore } from '../store/historyStore';
 import { DEFAULT_OVERLAY_STYLE } from '../lib/textGeometry';
+import { getClipVolume } from '../lib/volume';
 
 export default function Inspector() {
   const selectedClipId = useEditorStore((state) => state.selectedClipId);
@@ -156,6 +157,19 @@ export default function Inspector() {
   }
 
   const asset = assets.find((a) => a.id === clip.assetId);
+  // Volume only makes sense for clips that can actually produce sound.
+  // Images have no audio at all, and text overlays are handled by the
+  // branch above entirely; a video with no embedded audio track still
+  // shows the control (detecting "does this specific file have audio"
+  // would need real media analysis this app doesn't do, and a harmless
+  // no-op control is a fine outcome either way).
+  const supportsVolume = asset?.type === 'video' || asset?.type === 'audio';
+  const isMuted = getClipVolume(clip) === 0;
+
+  function handleToggleMute() {
+    checkpoint(); // discrete, one-click edit - same pattern as weight/alignment above
+    updateClip(clip.id, { volume: isMuted ? 1 : 0 });
+  }
 
   return (
     <section className="panel inspector">
@@ -170,6 +184,27 @@ export default function Inspector() {
         <dt>Duration</dt>
         <dd>{clip.duration.toFixed(2)}s</dd>
       </dl>
+
+      {supportsVolume && (
+        <div className="field">
+          <span className="field-label">Volume</span>
+          <div className="volume-row">
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={getClipVolume(clip)}
+              onFocus={handleFieldFocus}
+              onChange={(event) => updateClip(clip.id, { volume: Number(event.target.value) })}
+              onBlur={handleFieldBlur}
+            />
+            <span className="volume-readout">{Math.round(getClipVolume(clip) * 100)}%</span>
+          </div>
+          <button onClick={handleToggleMute}>{isMuted ? 'Unmute' : 'Mute'}</button>
+        </div>
+      )}
+
       <button className="delete-button" onClick={handleDelete}>
         Delete Clip
       </button>

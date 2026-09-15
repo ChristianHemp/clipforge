@@ -129,11 +129,13 @@ function VideoLayer({ asset, clip, currentTime, isPlaying }) {
   // Routes this video's embedded audio through the same shared graph
   // AudioLayer uses, so a video clip's own dialogue/sound mixes
   // correctly with any overlapping standalone audio clips instead of
-  // playing through a separate, unmixed native output path.
-  useMediaElementAudioRouting(videoRef);
+  // playing through a separate, unmixed native output path. Also
+  // returns this element's GainNode (Phase 9), kept in sync with
+  // clip.volume below.
+  const gainNodeRef = useMediaElementAudioRouting(videoRef);
 
   useEffect(() => {
-    syncMediaElement(videoRef.current, clip, currentTime, isPlaying, VIDEO_DRIFT_TOLERANCE_SECONDS);
+    syncMediaElement(videoRef.current, clip, currentTime, isPlaying, VIDEO_DRIFT_TOLERANCE_SECONDS, gainNodeRef.current);
   }, [clip, currentTime, isPlaying]);
 
   // Deterministically silence this element's audio the instant it's no

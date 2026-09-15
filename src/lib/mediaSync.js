@@ -1,16 +1,24 @@
 import { getClipSourceTime } from './playback';
+import { getClipVolume, GAIN_RAMP_TIME_CONSTANT } from './volume';
 
-// Synchronizes a <video>/<audio> element's playback position and
-// play/pause state to the timeline. Shared by Preview's VideoLayer and
-// AudioLayer (src/components/) so both element types use identical
-// drift-correction logic - only the tolerance differs per call site
-// (audio drift tends to be more perceptible than a slightly-off video
-// frame, so AudioLayer uses a tighter threshold than VideoLayer).
+// Synchronizes a <video>/<audio> element's playback position, play/
+// pause state, AND (Phase 9) its GainNode's volume to the timeline/
+// clip state. Shared by Preview's VideoLayer and AudioLayer so both
+// element types use identical logic - only the drift tolerance differs
+// per call site.
 //
-// This single check handles both "correct small drift during normal
-// playback" AND "the user just scrubbed somewhere else" - there is no
-// separate code path for a jump versus ordinary jitter.
-export function syncMediaElement(element, clip, currentTime, isPlaying, driftToleranceSeconds) {
+// This single position check handles both "correct small drift during
+// normal playback" AND "the user just scrubbed somewhere else" - there
+// is no separate code path for a jump versus ordinary jitter.
+//
+// `gainNode` is optional (null before routing has run, or if Web Audio
+// is unavailable - see useMediaElementAudioRouting.js): when present,
+// its gain is pushed toward the clip's current volume via
+// setTargetAtTime rather than a direct assignment, to avoid an audible
+// click if this fires while the value is changing quickly (e.g.
+// dragging the Inspector's volume slider on a clip that's currently
+// playing). See lib/volume.js for the exact ramp duration.
+export function syncMediaElement(element, clip, currentTime, isPlaying, driftToleranceSeconds, gainNode) {
   if (!element) return;
 
   const sourceTime = getClipSourceTime(clip, currentTime);
@@ -27,5 +35,9 @@ export function syncMediaElement(element, clip, currentTime, isPlaying, driftTol
     element.play().catch(() => {});
   } else if (!isPlaying && !element.paused) {
     element.pause();
+  }
+
+  if (gainNode) {
+    gainNode.gain.setTargetAtTime(getClipVolume(clip), gainNode.context.currentTime, GAIN_RAMP_TIME_CONSTANT);
   }
 }

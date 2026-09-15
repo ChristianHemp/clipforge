@@ -1,6 +1,7 @@
 import { getActiveClip, getClipSourceTime } from '../lib/playback';
 import { computeAspectFitRect } from './aspectFit';
 import { drawTextOverlays } from './renderTextOverlays';
+import { getClipVolume } from '../lib/volume';
 
 // Looser than Preview's 0.3s tolerance would be too loose for export
 // (we want the recorded frame to closely match the intended source
@@ -16,7 +17,7 @@ const DRIFT_TOLERANCE_SECONDS = 0.15;
 export function createFrameRenderer() {
   let lastActiveClipId = null;
 
-  return async function renderFrame(ctx, { canvasWidth, canvasHeight, time, tracks, assets, videoElements }) {
+  return async function renderFrame(ctx, { canvasWidth, canvasHeight, time, tracks, assets, videoElements, audioGraph }) {
     // Filled every frame before anything else - this is what makes a
     // gap between clips render as black without any special-casing:
     // if nothing is active below, this is simply never painted over.
@@ -58,6 +59,15 @@ export function createFrameRenderer() {
         }
         if (video.paused) {
           await video.play().catch(() => {});
+        }
+
+        // This element may be shared with a DIFFERENT clip (same
+        // asset, used twice) that has a different volume - so gain is
+        // re-applied here, keyed to THIS tick's active clip, every
+        // frame, rather than once when the element was first routed.
+        const gainNode = audioGraph?.getGainNode(video);
+        if (gainNode) {
+          gainNode.gain.value = getClipVolume(activeClip);
         }
 
         const rect = computeAspectFitRect(video.videoWidth, video.videoHeight, canvasWidth, canvasHeight);
