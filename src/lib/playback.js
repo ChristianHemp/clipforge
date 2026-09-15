@@ -57,6 +57,31 @@ export function getActiveClip(tracks, assets, time, assetType) {
   return null;
 }
 
+// Like getActiveClip, but returns EVERY matching clip active at
+// `time`, not just the first. Video (and image) intentionally keep the
+// single-clip "first match wins" policy above - only audio needs true
+// overlap support, since multiple audio sources are naturally expected
+// to play together (background music + a sound effect + a video clip's
+// own dialogue, for example), unlike video where showing more than one
+// clip at once would require actual layer compositing this app doesn't
+// have.
+export function getActiveClips(tracks, assets, time, assetType) {
+  const active = [];
+  for (const track of tracks) {
+    for (const clip of track.clips) {
+      const isActive = time >= clip.startTime && time < clip.startTime + clip.duration;
+      if (!isActive) continue;
+
+      if (assetType) {
+        const asset = assets.find((a) => a.id === clip.assetId);
+        if (!asset || asset.type !== assetType) continue;
+      }
+      active.push(clip);
+    }
+  }
+  return active;
+}
+
 // Maps a moment on the global timeline to a moment within the clip's
 // own source media. E.g. if a clip starts at t=8 on the timeline but
 // its source video is trimmed to start 2s in, then timeline time 11

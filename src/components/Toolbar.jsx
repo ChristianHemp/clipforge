@@ -5,6 +5,7 @@ import { getProjectDuration, formatTime } from '../lib/playback';
 import { clearPersistedProject } from '../lib/projectPersistence';
 import { performUndo, performRedo } from '../lib/undoRedoActions';
 import { useExportProject } from '../export/useExportProject';
+import { resumeEditorAudioContext } from '../audio/audioGraph';
 
 export default function Toolbar() {
   const isPlaying = useEditorStore((state) => state.isPlaying);
@@ -27,6 +28,9 @@ export default function Toolbar() {
   function handleTogglePlayback() {
     if (!isPlaying) {
       if (projectDuration <= 0) return; // nothing to play
+      // A genuine user gesture (this click) - the one place browsers
+      // reliably allow an AudioContext to leave the 'suspended' state.
+      resumeEditorAudioContext();
       // Restart from the beginning if pressing Play while sitting at
       // (or past) the end, rather than doing nothing.
       if (currentTime >= projectDuration) {

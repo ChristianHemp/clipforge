@@ -1,16 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { useProjectStore } from '../store/projectStore';
-import { getActiveClip, getClipSourceTime } from '../lib/playback';
+import { getActiveClip, getActiveClips } from '../lib/playback';
+import { syncMediaElement } from '../lib/mediaSync';
+import { useMediaElementAudioRouting } from '../audio/useMediaElementAudioRouting';
+import AudioLayer from './AudioLayer';
 
-// A video is considered "in sync" if the <video> element's own
-// currentTime is within this many seconds of where the timeline says
-// it should be. Small drift (normal decoder jitter) is left alone so
-// native playback stays smooth; anything bigger snaps immediately.
-// This single check handles both drift-correction during normal
-// playback AND scrub-seeking - there's no separate code path for
-// "the user just jumped somewhere else".
-const DRIFT_TOLERANCE_SECONDS = 0.3;
+const VIDEO_DRIFT_TOLERANCE_SECONDS = 0.3;
 
 // Preview no longer shows the *selected* clip - it shows whatever is
 // active at the global `currentTime`. Selection (editorStore) and
@@ -30,6 +26,9 @@ export default function Preview() {
   const activeImageClip = !activeVideoClip
     ? getActiveClip(tracks, assets, currentTime, 'image')
     : null;
+  // Unlike video, audio genuinely supports overlap - see
+  // getActiveClips in lib/playback.js.
+  const activeAudioClips = getActiveClips(tracks, assets, currentTime, 'audio');
 
   const videoAsset = activeVideoClip
     ? assets.find((a) => a.id === activeVideoClip.assetId)
@@ -65,33 +64,43 @@ export default function Preview() {
           <p className="empty-state">No active clip at this position.</p>
         )}
       </div>
+
+      {/* No visual output - each owns one <audio> element's sync/routing
+          lifecycle. Keyed by clip id, not asset id: two different clips
+          can reference the same audio asset and need independent
+          playback positions. */}
+      {activeAudioClips.map((clip) => {
+        const asset = assets.find((a) => a.id === clip.assetId);
+        return asset ? (
+          <AudioLayer key={clip.id} asset={asset} clip={clip} currentTime={currentTime} isPlaying={isPlaying} />
+        ) : null;
+      })}
     </section>
   );
 }
 
 function VideoLayer({ asset, clip, currentTime, isPlaying }) {
   const videoRef = useRef(null);
+  // Routes this video's embedded audio through the same shared graph
+  // AudioLayer uses, so a video clip's own dialogue/sound mixes
+  // correctly with any overlapping standalone audio clips instead of
+  // playing through a separate, unmixed native output path.
+  useMediaElementAudioRouting(videoRef);
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const sourceTime = getClipSourceTime(clip, currentTime);
-
-    if (Math.abs(video.currentTime - sourceTime) > DRIFT_TOLERANCE_SECONDS) {
-      video.currentTime = sourceTime;
-    }
-
-    if (isPlaying && video.paused) {
-      // Playback is user-initiated (the Play button), but this call
-      // itself happens inside an effect rather than the click handler
-      // directly, so some browsers may still block it without a prior
-      // gesture - fail silently rather than throwing.
-      video.play().catch(() => {});
-    } else if (!isPlaying && !video.paused) {
-      video.pause();
-    }
+    syncMediaElement(videoRef.current, clip, currentTime, isPlaying, VIDEO_DRIFT_TOLERANCE_SECONDS);
   }, [clip, currentTime, isPlaying]);
+
+  // Deterministically silence this element's audio the instant it's no
+  // longer the active clip (component unmount - e.g. the playhead
+  // entered a gap, or a different clip became active), rather than
+  // relying on garbage-collection timing to eventually stop it.
+  useEffect(() => {
+    const video = videoRef.current;
+    return () => {
+      video?.pause();
+    };
+  }, []);
 
   return (
     <video

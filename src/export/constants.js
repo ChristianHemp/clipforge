@@ -18,4 +18,10 @@ export const EXPORT_FPS = 30;
 // range as YouTube's own recommended 720p30 upload bitrate).
 export const EXPORT_VIDEO_BITRATE = 8_000_000;
 
+// 128 kbps is a standard, transparent-enough default for Opus stereo.
+// Specified explicitly (not left to MediaRecorder's own default)
+// alongside EXPORT_VIDEO_BITRATE so both tracks have deliberate,
+// known encoding parameters rather than one specified and one implicit.
+export const EXPORT_AUDIO_BITRATE = 128_000;
+
 export const EXPORT_FILENAME = 'video-editor-export.webm';
