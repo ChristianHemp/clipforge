@@ -16,16 +16,6 @@ The editor currently supports:
 - **Local persistence** — the project and all uploaded media survive a page refresh via IndexedDB, with no server round-trip
 - **Browser-side export** — renders the composed timeline to a downloadable WebM file using `<canvas>` and `MediaRecorder`, with no server-side transcoding step
 
-## Motivation
-
-This project started as an exercise in **reimplementing** a video editing application around a deliberately different architecture and stack, rather than translating an existing codebase file-by-file. It was inspired by an existing AI-powered video editor, but the implementation here is a clean-room rebuild that:
-
-- removes the AI generation/chat layer entirely and rebuilds the product around **manual editing** — every clip, trim, and overlay is placed by direct user interaction, not generated
-- is written in **plain JavaScript/JSX**, not TypeScript, using runtime validation and defensive defaults instead of a compile-time type system
-- uses a **simpler, purpose-built architecture** sized for a standalone client-side editor, rather than carrying over machinery (AI orchestration, multi-provider service integrations, a generalized effects/skill registry) that a non-AI, single-purpose editor doesn't need
-
-The interesting engineering problems turned out to be the same ones any browser-based NLE has to solve regardless of stack: keeping a timeline clock authoritative over multiple independently-decoding media elements, mapping timeline time to source-media time under trimming, mixing overlapping audio sources without double-playback, and reconstructing a live composited video stream frame-by-frame for recording — all with only what the browser provides natively.
-
 ## Features
 
 **Timeline editing**
