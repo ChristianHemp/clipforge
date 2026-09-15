@@ -6,8 +6,11 @@ import Timeline from './components/Timeline';
 import Inspector from './components/Inspector';
 import { useEditorStore } from './store/editorStore';
 import { useProjectStore } from './store/projectStore';
+import { useHistoryStore } from './store/historyStore';
 import { usePlaybackClock } from './hooks/usePlaybackClock';
 import { useProjectPersistence } from './hooks/useProjectPersistence';
+import { performUndo, performRedo } from './lib/undoRedoActions';
+import { isEditableTarget } from './lib/isEditableTarget';
 
 export default function App() {
   // Mounted once, globally - this is what actually advances
@@ -23,16 +26,36 @@ export default function App() {
   const selectedClipId = useEditorStore((state) => state.selectedClipId);
   const setSelectedClipId = useEditorStore((state) => state.setSelectedClipId);
   const removeClip = useProjectStore((state) => state.removeClip);
+  const checkpoint = useHistoryStore((state) => state.checkpoint);
 
-  // Delete/Backspace removes the selected clip, as a faster alternative
-  // to the Inspector's Delete button. Ignored while typing in a field
-  // so future text inputs (clip names, etc.) don't lose keystrokes.
+  // Global keyboard shortcuts: Delete/Backspace removes the selected
+  // clip (a faster alternative to the Inspector's Delete button), and
+  // Cmd/Ctrl+Z / Cmd/Ctrl+Shift+Z (also Ctrl+Y) drive undo/redo. All of
+  // these are ignored while focus is inside a text field - see
+  // isEditableTarget.js - so the browser's own text-undo and typing
+  // keep working normally there instead of being hijacked.
   useEffect(() => {
     function handleKeyDown(event) {
-      if (!selectedClipId) return;
-      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
+      if (isEditableTarget(event.target)) return;
 
+      const key = event.key.toLowerCase();
+      const withModifier = event.metaKey || event.ctrlKey;
+
+      if (withModifier && key === 'z') {
+        event.preventDefault(); // don't let the browser attempt its own page-level undo
+        if (event.shiftKey) performRedo();
+        else performUndo();
+        return;
+      }
+      if (withModifier && key === 'y') {
+        event.preventDefault();
+        performRedo();
+        return;
+      }
+
+      if (!selectedClipId) return;
       if (event.key === 'Delete' || event.key === 'Backspace') {
+        checkpoint(); // before removeClip, matching Inspector's Delete button
         removeClip(selectedClipId);
         setSelectedClipId(null);
       }
@@ -40,7 +63,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedClipId, removeClip, setSelectedClipId]);
+  }, [selectedClipId, removeClip, setSelectedClipId, checkpoint]);
 
   // Wait for hydration before rendering the real editor - otherwise a
   // saved project would flash as empty for a moment while IndexedDB

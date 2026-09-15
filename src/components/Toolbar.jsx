@@ -1,7 +1,9 @@
 import { useEditorStore } from '../store/editorStore';
 import { useProjectStore } from '../store/projectStore';
+import { useHistoryStore } from '../store/historyStore';
 import { getProjectDuration, formatTime } from '../lib/playback';
 import { clearPersistedProject } from '../lib/projectPersistence';
+import { performUndo, performRedo } from '../lib/undoRedoActions';
 
 export default function Toolbar() {
   const isPlaying = useEditorStore((state) => state.isPlaying);
@@ -14,6 +16,9 @@ export default function Toolbar() {
   const tracks = useProjectStore((state) => state.tracks);
   const assets = useProjectStore((state) => state.assets);
   const clearProject = useProjectStore((state) => state.clearProject);
+  const canUndo = useHistoryStore((state) => state.past.length > 0);
+  const canRedo = useHistoryStore((state) => state.future.length > 0);
+  const clearHistory = useHistoryStore((state) => state.clearHistory);
 
   const projectDuration = getProjectDuration(tracks);
 
@@ -38,6 +43,7 @@ export default function Toolbar() {
 
     clearProject(); // in-memory: revokes blob URLs, empties assets/tracks
     resetTransientState(); // selection/playhead/playback back to defaults
+    clearHistory(); // a true reset is a history BOUNDARY - Undo must not resurrect a cleared project
 
     try {
       await clearPersistedProject(); // immediate, not debounced - a refresh right after Clear shouldn't restore stale data
@@ -52,6 +58,12 @@ export default function Toolbar() {
     <header className="toolbar">
       <h1>Video Editor</h1>
       <div className="transport">
+        <button onClick={performUndo} disabled={!canUndo} title="Undo (Cmd/Ctrl+Z)">
+          Undo
+        </button>
+        <button onClick={performRedo} disabled={!canRedo} title="Redo (Cmd/Ctrl+Shift+Z)">
+          Redo
+        </button>
         <button onClick={handleTogglePlayback} disabled={projectDuration <= 0}>
           {isPlaying ? 'Pause' : 'Play'}
         </button>

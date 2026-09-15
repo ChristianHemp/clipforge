@@ -1,5 +1,6 @@
 import { useEditorStore } from '../store/editorStore';
 import { useProjectStore, findClip } from '../store/projectStore';
+import { useHistoryStore } from '../store/historyStore';
 
 export default function Inspector() {
   const selectedClipId = useEditorStore((state) => state.selectedClipId);
@@ -7,6 +8,7 @@ export default function Inspector() {
   const tracks = useProjectStore((state) => state.tracks);
   const assets = useProjectStore((state) => state.assets);
   const removeClip = useProjectStore((state) => state.removeClip);
+  const checkpoint = useHistoryStore((state) => state.checkpoint);
 
   const { clip } = findClip(tracks, selectedClipId);
 
@@ -24,6 +26,7 @@ export default function Inspector() {
   const asset = assets.find((a) => a.id === clip.assetId);
 
   function handleDelete() {
+    checkpoint(); // before removeClip, so Undo restores exactly this clip (same id, same fields)
     removeClip(clip.id);
     setSelectedClipId(null);
   }

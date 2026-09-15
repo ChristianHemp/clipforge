@@ -45,6 +45,15 @@ button:hover {
   border-color: var(--accent);
 }
 
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+button:disabled:hover {
+  border-color: var(--border);
+}
+
 .app {
   display: flex;
   flex-direction: column;

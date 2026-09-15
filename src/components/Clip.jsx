@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { useProjectStore } from '../store/projectStore';
+import { useHistoryStore } from '../store/historyStore';
 import { beginPointerDrag } from '../lib/pointerDrag';
 import { calculateClipMove, calculateLeftTrim, calculateRightTrim } from '../lib/clipEditing';
 import { PIXELS_PER_SECOND } from '../lib/constants';
@@ -11,7 +12,20 @@ export default function Clip({ clip, asset }) {
   const isPlaying = useEditorStore((state) => state.isPlaying);
   const pause = useEditorStore((state) => state.pause);
   const updateClip = useProjectStore((state) => state.updateClip);
+  const beginTransaction = useHistoryStore((state) => state.beginTransaction);
+  const commitTransaction = useHistoryStore((state) => state.commitTransaction);
+  const cancelTransaction = useHistoryStore((state) => state.cancelTransaction);
   const isSelected = selectedClipId === clip.id;
+
+  // Shared by all three drag handlers: a real drag/trim (the pointer
+  // actually moved) becomes exactly one history entry; a plain
+  // selection click (pointerdown+pointerup, zero movement) creates
+  // none. Without this, every ordinary click-to-select would push a
+  // no-op entry onto the undo stack.
+  function endTransaction(moved) {
+    if (moved) commitTransaction();
+    else cancelTransaction();
+  }
 
   // Snapshot of the clip's own fields taken once at pointerdown. Every
   // pointermove during that same gesture computes the new values from
@@ -38,6 +52,7 @@ export default function Clip({ clip, asset }) {
     event.preventDefault();
     event.stopPropagation(); // don't let Timeline's background click-to-seek fire
     selectAndPause();
+    beginTransaction(); // snapshot taken BEFORE any updateClip call in this gesture
 
     dragOriginRef.current = { startTime: clip.startTime };
 
@@ -47,6 +62,7 @@ export default function Clip({ clip, asset }) {
         const startTime = calculateClipMove(dragOriginRef.current.startTime, deltaSeconds);
         updateClip(clip.id, { startTime });
       },
+      onEnd: endTransaction,
     });
   }
 
@@ -55,6 +71,7 @@ export default function Clip({ clip, asset }) {
     event.preventDefault();
     event.stopPropagation(); // don't also trigger handleBodyPointerDown
     selectAndPause();
+    beginTransaction();
 
     dragOriginRef.current = {
       startTime: clip.startTime,
@@ -67,6 +84,7 @@ export default function Clip({ clip, asset }) {
         const deltaSeconds = deltaPixels / PIXELS_PER_SECOND;
         updateClip(clip.id, calculateLeftTrim({ ...dragOriginRef.current, deltaSeconds }));
       },
+      onEnd: endTransaction,
     });
   }
 
@@ -75,6 +93,7 @@ export default function Clip({ clip, asset }) {
     event.preventDefault();
     event.stopPropagation();
     selectAndPause();
+    beginTransaction();
 
     dragOriginRef.current = {
       trimStart: clip.trimStart ?? 0,
@@ -89,6 +108,7 @@ export default function Clip({ clip, asset }) {
           calculateRightTrim({ ...dragOriginRef.current, deltaSeconds, sourceDuration: asset?.duration })
         );
       },
+      onEnd: endTransaction,
     });
   }
 

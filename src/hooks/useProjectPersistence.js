@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useEditorStore } from '../store/editorStore';
-import { loadProject, saveProject, deleteAssetBlob } from '../lib/projectPersistence';
+import { loadProject, saveProject } from '../lib/projectPersistence';
 
 // Long enough to coalesce an entire drag/trim gesture's rapid
 // pointermove-driven updates (Phase 3) into a single write once the
@@ -50,32 +50,27 @@ export function useProjectPersistence() {
   // write an empty project over a real saved one before loadProject()
   // above has had a chance to restore it - the exact feedback loop the
   // Phase 4 brief calls out to avoid.
+  //
+  // Phase 4 also had this effect delete an asset's stored blob
+  // whenever that asset's id disappeared from projectStore, to keep
+  // removeAsset() (not wired to any UI, but callable) from leaving an
+  // orphan behind. Phase 5's undo removed that: Undo can make an asset
+  // disappear from the live store TEMPORARILY (restoring a pre-upload
+  // snapshot) with Redo able to bring it right back - "disappeared
+  // from the store" no longer means "the user is done with this
+  // asset". Deleting its blob on that signal would silently break Redo
+  // (the in-memory asset would still work, but reloading the page
+  // after Redo would find its blob missing from IndexedDB). Real
+  // per-asset deletion doesn't have a UI yet anyway; when it does, it
+  // should call deleteAssetBlob from that action's own discrete
+  // handler (alongside its history checkpoint), not be inferred here
+  // from a diff against the previous render.
   const debounceTimerRef = useRef(null);
-  const knownAssetIdsRef = useRef(null);
 
   useEffect(() => {
     if (!isHydrated) return;
 
-    // Seed with whatever's in the store right now (the just-hydrated
-    // set, or still-empty if there was nothing to restore) so the
-    // first real change doesn't get misread as "every asset removed".
-    knownAssetIdsRef.current = new Set(useProjectStore.getState().assets.map((a) => a.id));
-
     const unsubscribe = useProjectStore.subscribe((state) => {
-      // Clean up any asset that disappeared since the last change -
-      // this is what keeps removeAsset() (not currently wired to any
-      // UI, but callable) from leaving an orphaned blob behind, without
-      // projectStore.js itself needing to know IndexedDB exists.
-      const currentAssetIds = new Set(state.assets.map((a) => a.id));
-      for (const id of knownAssetIdsRef.current) {
-        if (!currentAssetIds.has(id)) {
-          deleteAssetBlob(id).catch((error) =>
-            console.error('Failed to delete stored asset blob:', error)
-          );
-        }
-      }
-      knownAssetIdsRef.current = currentAssetIds;
-
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = setTimeout(() => {
         saveProject(state)

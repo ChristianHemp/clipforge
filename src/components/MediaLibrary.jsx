@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { useProjectStore } from '../store/projectStore';
+import { useHistoryStore } from '../store/historyStore';
 import { generateId } from '../lib/id';
 import { detectAssetType, probeMediaMetadata } from '../lib/mediaProbe';
 import { DEFAULT_IMAGE_DURATION } from '../lib/constants';
@@ -11,6 +12,7 @@ export default function MediaLibrary() {
   const addAsset = useProjectStore((state) => state.addAsset);
   const getOrCreateTrack = useProjectStore((state) => state.getOrCreateTrack);
   const addClip = useProjectStore((state) => state.addClip);
+  const checkpoint = useHistoryStore((state) => state.checkpoint);
   const inputRef = useRef(null);
 
   async function handleFilesSelected(event) {
@@ -27,6 +29,7 @@ export default function MediaLibrary() {
       try {
         const metadata = await probeMediaMetadata(file, type);
         const id = generateId();
+        checkpoint(); // before addAsset, so Undo removes exactly this upload
         addAsset({
           id,
           name: file.name,
@@ -63,6 +66,7 @@ export default function MediaLibrary() {
       0
     );
 
+    checkpoint(); // before addClip, so Undo removes exactly this clip
     addClip(trackId, {
       id: generateId(),
       assetId: asset.id,
