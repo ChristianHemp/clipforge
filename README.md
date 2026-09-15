@@ -2,6 +2,22 @@
 
 A timeline-based video editor that runs entirely in the browser — upload video, image, and audio files, arrange them on a multi-track timeline, trim and reposition clips, add text overlays, mix audio, and export a finished video file. No backend, no server-side rendering, no account system. Everything — decoding, compositing, mixing, and encoding — happens client-side using native browser APIs.
 
+## Getting started
+
+```bash
+npm install
+npm run dev       # starts a local dev server
+```
+
+Other scripts:
+
+```bash
+npm run build      # production build to dist/
+npm run preview    # serve the production build locally
+```
+
+Requires a Chromium-based browser (or another browser with full `MediaRecorder` + `MediaStreamAudioDestinationNode` support) for export; playback and editing work in any modern browser with Web Audio support.
+
 ## Overview
 
 The editor currently supports:
@@ -110,22 +126,6 @@ Because `projectStore`'s mutators always build new arrays/objects rather than mu
 | Export | `canvas.captureStream()` + `MediaRecorder` (WebM/VP9+Opus with fallbacks) |
 
 No AI SDKs, no backend framework, no state-sync/collab library, no video-processing dependency (no ffmpeg.wasm, no WebCodecs) — the entire rendering and export pipeline is built on browser-native APIs.
-
-## Getting started
-
-```bash
-npm install
-npm run dev       # starts a local dev server
-```
-
-Other scripts:
-
-```bash
-npm run build      # production build to dist/
-npm run preview    # serve the production build locally
-```
-
-Requires a Chromium-based browser (or another browser with full `MediaRecorder` + `MediaStreamAudioDestinationNode` support) for export; playback and editing work in any modern browser with Web Audio support.
 
 ## Project structure
 
